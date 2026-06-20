@@ -1,6 +1,8 @@
 import GameSession from "../models/GameSession.js";
 import mongoose from "mongoose";
 import User from "../models/User.js";
+import GameState from "../models/GameState.js";
+import { validateShipPlacement } from "../utils/gameValidators.js";
 
 const generateRoomCode = () => {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -167,6 +169,30 @@ export const joinSession = async (req, res) => {
     session.status = "in_progress";
     await session.save();
 
+    const createEmptyBoard = (size) => {
+      const board = [];
+
+      for (let i = 0; i < size; i++) {
+        board.push(Array(size).fill("empty"));
+      }
+
+      return board;
+    };
+
+    const existingState = await GameState.findOne({ sessionId: session._id });
+
+    if (!existingState) {
+      await GameState.create({
+        sessionId: session._id,
+        player1Board: createEmptyBoard(session.gridSize),
+        player2Board: createEmptyBoard(session.gridSize),
+        player1Ships: [],
+        player2Ships: [],
+        currentTurn: session.ownerId,
+        gameStatus: "placement",
+      });
+    }
+
     const updatedSession = await GameSession.findById(session._id)
       .populate("ownerId", "displayName")
       .populate("opponentId", "displayName");
@@ -194,6 +220,132 @@ export const joinSession = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server error occurred while joining the room",
+    });
+  }
+};
+
+export const placeShips = async (req, res) => {
+  try {
+    const { sessionId, userId, ships } = req.body;
+
+    if (!sessionId || !userId || !ships) {
+      return res.status(400).json({
+        success: false,
+        message: "Session ID, User ID, and ships configurations are required",
+      });
+    }
+
+    if (
+      !mongoose.Types.ObjectId.isValid(sessionId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Session ID or User ID format",
+      });
+    }
+
+    const session = await GameSession.findById(sessionId);
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Game session not found",
+      });
+    }
+
+    if (session.status !== "in_progress") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Game session is not in progress. Ensure 2 players have joined.",
+      });
+    }
+
+    const gameState = await GameState.findOne({ sessionId });
+    if (!gameState) {
+      return res.status(404).json({
+        success: false,
+        message: "Game state not found for this session",
+      });
+    }
+
+    if (gameState.gameStatus !== "placement") {
+      return res.status(400).json({
+        success: false,
+        message: "Ships have already been placed and match is active/finished",
+      });
+    }
+
+    let playerRole = "";
+
+    if (session.ownerId.toString() === userId.toString()) {
+      playerRole = "player1";
+    } else if (
+      session.opponentId &&
+      session.opponentId.toString() === userId.toString()
+    ) {
+      playerRole = "player2";
+    } else {
+      return res.status(403).json({
+        success: false,
+        message: "User is not a participant in this game session",
+      });
+    }
+
+    const validation = validateShipPlacement(
+      ships,
+      session.gridSize,
+      session.shipConfig,
+    );
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: validation.message,
+      });
+    }
+
+    const board = gameState[`${playerRole}Board`];
+
+    for (let r = 0; r < session.gridSize; r++) {
+      for (let c = 0; c < session.gridSize; c++) {
+        board[r][c] = "empty";
+      }
+    }
+
+    for (const ship of ships) {
+      for (const pos of ship.positions) {
+        board[pos.row][pos.col] = "ship";
+      }
+    }
+
+    gameState[`${playerRole}Ships`] = ships;
+    gameState[`${playerRole}Board`] = board;
+
+    const otherRole = playerRole === "player1" ? "player2" : "player1";
+    const otherShips = gameState[`${otherRole}Ships`];
+
+    let gameStarted = false;
+
+    if (otherShips && otherShips.length > 0) {
+      gameState.gameStatus = "active";
+      gameStarted = false;
+    }
+
+    gameState.markModified(`${playerRole}Board`);
+
+    await gameState.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Ships placed and validated successfully",
+      gameStatus: gameState.gameStatus,
+      gameStarted,
+    });
+  } catch (error) {
+    console.error("Error in placeShips:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error occurred while submitting ship placements",
     });
   }
 };
