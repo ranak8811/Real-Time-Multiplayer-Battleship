@@ -10,6 +10,7 @@ export const socket = io(SOCKET_URL, {
 export const connectSocket = (userId) => {
   if (!socket.connected) {
     socket.io.opts.query = { userId };
+    socket.connect();
     console.log("Socket successfully connected for User ID:", userId);
   }
 };
