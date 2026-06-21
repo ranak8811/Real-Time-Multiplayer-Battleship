@@ -21,7 +21,6 @@ const ShipPlacementPage = () => {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-
   const [placedShips, setPlacedShips] = useState([]);
   const [board, setBoard] = useState([]);
   const [selectedShipType, setSelectedShipType] = useState("carrier");
@@ -75,10 +74,20 @@ const ShipPlacementPage = () => {
       loadSessionDetails();
     });
 
+    socket.on("match-start", (data) => {
+      console.log("[Socket Event] Match starting:", data);
+      toast.success(data.message || "Both fleets locked in! Match starts.");
+
+      setTimeout(() => {
+        navigate(`/game/${sessionId}`);
+      }, 1500);
+    });
+
     return () => {
       socket.off("player-joined-room");
+      socket.off("match-start");
     };
-  }, [user]);
+  }, [user, sessionId]);
 
   if (contextLoading || loading) {
     return (
@@ -356,12 +365,13 @@ const ShipPlacementPage = () => {
                       type="button"
                       onClick={() => setSelectedShipType(type)}
                       disabled={isCompleted || submitting}
-                      className={`w-full p-4 rounded-xl border text-left flex justify-between items-center transition ${isSelected
+                      className={`w-full p-4 rounded-xl border text-left flex justify-between items-center transition ${
+                        isSelected
                           ? "bg-cyan-500/10 border-cyan-500 text-cyan-400"
                           : isCompleted
                             ? "bg-slate-900/30 border-slate-900 text-slate-600 cursor-not-allowed"
                             : "bg-slate-950 border-slate-850 text-slate-300 hover:border-slate-700"
-                        }`}
+                      }`}
                     >
                       <span className="capitalize font-semibold">
                         {type} (Size: {SHIP_SIZES[type]})

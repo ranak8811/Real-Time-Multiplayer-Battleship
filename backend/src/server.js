@@ -22,6 +22,8 @@ const io = new Server(server, {
 
 initializeSockets(io);
 
+app.set("io", io);
+
 server.listen(PORT, () => {
   console.log(`=========================================`);
   console.log(`  Battleship Server is running on Port ${PORT}`);

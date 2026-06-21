@@ -328,7 +328,16 @@ export const placeShips = async (req, res) => {
 
     if (otherShips && otherShips.length > 0) {
       gameState.gameStatus = "active";
-      gameStarted = false;
+      gameStarted = true;
+
+      const io = req.app.get("io");
+
+      if (io) {
+        io.to(session.roomCode.trim().toUpperCase()).emit("match-start", {
+          sessionId: session._id,
+          message: "Both fleets are locked in. The battle commences!",
+        });
+      }
     }
 
     gameState.markModified(`${playerRole}Board`);
