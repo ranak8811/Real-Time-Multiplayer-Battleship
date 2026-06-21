@@ -1,4 +1,5 @@
 import axiosClient from "../api/axiosClient";
+import { toast } from "react-toastify";
 
 export const getSessions = async () => {
   try {
@@ -6,7 +7,10 @@ export const getSessions = async () => {
     return response.data;
   } catch (error) {
     console.error("Error in getSessions service:", error);
-    throw error.response?.data?.message || "Failed to load active battle rooms";
+
+    toast.error(
+      error.response?.data?.message || "Failed to load active battle rooms",
+    );
   }
 };
 
@@ -16,7 +20,8 @@ export const createSession = async (ownerId, gridSize) => {
     return response.data;
   } catch (error) {
     console.error("Error in createSession service:", error);
-    throw error.response?.data?.message || "Failed to create game room";
+
+    toast.error(error.response?.data?.message || "Failed to create game room");
   }
 };
 
@@ -29,6 +34,19 @@ export const joinSession = async (roomCode, opponentId) => {
     return response.data;
   } catch (error) {
     console.error("Error in joinSession service:", error);
-    throw error.response?.data?.message || "Failed to join game room";
+
+    toast.error(error.response?.data?.message || "Failed to join game room");
+  }
+};
+
+export const getSessionById = async (sessionId) => {
+  try {
+    const response = await axiosClient.get(`/sessions/${sessionId}`);
+    return response.data;
+  } catch (error) {
+    console.error("Error in getSessionById service:", error);
+    toast.error(
+      error.response?.data?.message || "Failed to load battle room details",
+    );
   }
 };

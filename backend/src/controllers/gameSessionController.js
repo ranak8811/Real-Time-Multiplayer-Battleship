@@ -349,3 +349,38 @@ export const placeShips = async (req, res) => {
     });
   }
 };
+
+export const getSessionById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Session ID format",
+      });
+    }
+
+    const session = await GameSession.findById(id)
+      .populate("ownerId", "displayName")
+      .populate("opponentId", "displayName");
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Game session not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      session,
+    });
+  } catch (error) {
+    console.error("Error in getSessionById:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error occurred while retrieving session details",
+    });
+  }
+};

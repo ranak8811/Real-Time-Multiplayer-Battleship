@@ -1,6 +1,7 @@
 import express from "express";
 import {
   createSession,
+  getSessionById,
   getSessions,
   joinSession,
   placeShips,
@@ -15,5 +16,7 @@ router.get("/", getSessions);
 router.post("/join", joinSession);
 
 router.post("/place-ships", placeShips);
+
+router.get("/:id", getSessionById);
 
 export default router;
