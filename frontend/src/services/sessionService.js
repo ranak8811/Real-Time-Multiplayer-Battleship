@@ -50,3 +50,17 @@ export const getSessionById = async (sessionId) => {
     );
   }
 };
+
+export const placeShips = async (sessionId, userId, ships) => {
+  try {
+    const response = await axiosClient.post("/sessions/place-ships", {
+      sessionId,
+      userId,
+      ships,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error in placeShips service:", error);
+    throw error.response?.data?.message || "Failed to submit ship placements";
+  }
+};
