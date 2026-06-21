@@ -381,9 +381,12 @@ export const getSessionById = async (req, res) => {
       });
     }
 
+    const gameState = await GameState.findOne({ sessionId: id });
+
     return res.status(200).json({
       success: true,
       session,
+      gameState,
     });
   } catch (error) {
     console.error("Error in getSessionById:", error);
