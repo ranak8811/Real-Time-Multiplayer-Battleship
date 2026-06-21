@@ -396,3 +396,165 @@ export const getSessionById = async (req, res) => {
     });
   }
 };
+
+export const fireShot = async (req, res) => {
+  try {
+    const { sessionId, userId, row, col } = req.body;
+
+    if (!sessionId || !userId || row === undefined || col === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Session ID, User ID, and coordinates (row, col) are required",
+      });
+    }
+
+    if (
+      !mongoose.Types.ObjectId.isValid(sessionId) ||
+      !mongoose.Types.ObjectId.isValid(userId)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Session ID or User ID format",
+      });
+    }
+
+    const session = await GameSession.findById(sessionId);
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Game session not found",
+      });
+    }
+
+    if (session.status !== "in_progress") {
+      return res.status(400).json({
+        success: false,
+        message: "Game session is not active",
+      });
+    }
+
+    const gameState = await GameState.findOne({ sessionId });
+    if (!gameState) {
+      return res.status(404).json({
+        success: false,
+        message: "Game state not found",
+      });
+    }
+
+    if (gameState.gameStatus !== "active") {
+      return res.status(400).json({
+        success: false,
+        message: "Match is not currently in active gameplay mode",
+      });
+    }
+
+    if (gameState.currentTurn.toString() !== userId.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: "It is not your turn to make a move",
+      });
+    }
+
+    if (
+      row < 0 ||
+      row >= session.gridSize ||
+      col < 0 ||
+      col >= session.gridSize
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: `Coordinates are out of bounds (Grid size is ${session.gridSize}x${session.gridSize})`,
+      });
+    }
+
+    const attackerRole =
+      session.ownerId.toString() === userId.toString() ? "player1" : "player2";
+    const defenderRole = attackerRole === "player1" ? "player2" : "player1";
+
+    const defenderBoard = gameState[`${defenderRole}Board`];
+    const targetCell = defenderBoard[row][col];
+
+    if (targetCell === "hit" || targetCell === "miss") {
+      return res.status(400).json({
+        success: false,
+        message: "You have already attacked this coordinate",
+      });
+    }
+
+    let isHit = false;
+    let sunkShipId = null;
+
+    if (targetCell === "ship") {
+      isHit = true;
+      defenderBoard[row][col] = "hit";
+
+      const defenderShips = gameState[`${defenderRole}Ships`];
+      for (const ship of defenderShips) {
+        const isPart = ship.positions.some(
+          (pos) => pos.row === row && pos.col === col,
+        );
+        if (isPart) {
+          const alreadyHit = ship.hits.some(
+            (h) => h.row === row && h.col === col,
+          );
+          if (!alreadyHit) {
+            ship.hits.push({ row, col });
+          }
+
+          if (ship.hits.length === ship.size) {
+            sunkShipId = ship.shipId;
+          }
+          break;
+        }
+      }
+    } else {
+      defenderBoard[row][col] = "miss";
+    }
+
+    const defenderShips = gameState[`${defenderRole}Ships`];
+    const allSunk = defenderShips.every(
+      (ship) => ship.hits.length === ship.size,
+    );
+
+    if (allSunk) {
+      gameState.gameStatus = "finished";
+      gameState.winner = userId;
+      session.status = "finished";
+      await session.save();
+    } else {
+      gameState.currentTurn =
+        attackerRole === "player1" ? session.opponentId : session.ownerId;
+    }
+
+    gameState.markModified(`${defenderRole}Board`);
+    gameState.markModified(`${defenderRole}Ships`);
+    await gameState.save();
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(session.roomCode.trim().toUpperCase()).emit("shot-fired", {
+        gameState,
+        attackerId: userId,
+        row,
+        col,
+        result: isHit ? "hit" : "miss",
+        sunkShip: sunkShipId,
+        winnerId: gameState.winner || null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: isHit ? "Hit!" : "Miss!",
+      result: isHit ? "hit" : "miss",
+      sunkShip: sunkShipId,
+      winnerId: gameState.winner || null,
+    });
+  } catch (error) {
+    console.error("Error in fireShot:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error occurred while executing fire strike",
+    });
+  }
+};
