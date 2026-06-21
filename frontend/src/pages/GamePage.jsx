@@ -22,7 +22,6 @@ const GamePage = () => {
   const [playerRole, setPlayerRole] = useState(null);
   const navigate = useNavigate();
 
-
   const loadGameDetails = async () => {
     try {
       const data = await getSessionById(sessionId);
@@ -54,7 +53,7 @@ const GamePage = () => {
     }
   }, [user, sessionId]);
 
-
+  // সকেট ইভেন্ট
   useEffect(() => {
     if (!session || !user) return;
 
@@ -63,19 +62,13 @@ const GamePage = () => {
       userId: user.userId,
     });
 
-    console.log("[Socket] Joined battlefield room:", session.roomCode);
-
-
+    // ১. শট ফায়ার হওয়ার রিয়েল-টাইম আপডেট
     socket.on("shot-fired", (data) => {
-      console.log("[Socket Event] Shot Fired Received:", data);
-
-
       setGameState(data.gameState);
 
       const colLetter = String.fromCharCode(65 + data.col);
       const rowNumber = data.row + 1;
       const isAttacker = data.attackerId === user.userId;
-
 
       if (data.result === "hit") {
         if (isAttacker) {
@@ -109,7 +102,6 @@ const GamePage = () => {
         }
       }
 
-
       if (data.winnerId) {
         if (data.winnerId === user.userId) {
           toast.success("VICTORY! You have destroyed the entire enemy fleet!", {
@@ -123,14 +115,25 @@ const GamePage = () => {
       }
     });
 
+    // ২. অপোনেন্ট খেলা ছেড়ে চলে যাওয়ার রিয়েল-টাইম আপডেট লিসেনার
+    socket.on("opponent-left", (data) => {
+      console.log("[Socket Event] Opponent Left Room:", data);
+      setGameState(data.gameState);
+      toast.error(
+        data.message || "Your opponent left the match. You win by forfeit!",
+        { autoClose: false },
+      );
+    });
+
     return () => {
       socket.off("shot-fired");
+      socket.off("opponent-left");
     };
   }, [session?.roomCode, user?.userId]);
 
   if (contextLoading || loading) {
     return (
-      <div className="min-h-screen bg-slate-955 text-white flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-cyan-500" />
       </div>
     );
@@ -170,7 +173,6 @@ const GamePage = () => {
   const isMyTurn = gameState.currentTurn === user.userId;
   const isFinished = gameState.gameStatus === "finished";
 
-
   const handleCellAttack = async (row, col) => {
     if (isFinished) return;
     if (!isMyTurn) {
@@ -188,6 +190,23 @@ const GamePage = () => {
     } catch (error) {
       toast.error(error);
     }
+  };
+
+  // ম্যানুয়াল রিট্রিট বা লিভ করার হ্যান্ডলার
+  const handleRetreat = () => {
+    if (!isFinished) {
+      const confirmRetreat = window.confirm(
+        "Are you sure you want to retreat? This will count as a forfeit and you will lose the match!",
+      );
+      if (!confirmRetreat) return;
+
+      // সার্ভারে লিভ করার সকেট ইভেন্ট পাঠানো
+      socket.emit("leave-room", {
+        roomCode: session.roomCode,
+        userId: user.userId,
+      });
+    }
+    navigate("/lobby");
   };
 
   const getCellColor = (cell, isRadar) => {
@@ -213,9 +232,9 @@ const GamePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-955 bg-slate-950 text-white p-4 md:p-8 font-sans selection:bg-cyan-500/30">
+    <div className="min-h-screen bg-slate-950 text-white p-4 md:p-8 font-sans selection:bg-cyan-500/30">
       <div className="max-w-6xl mx-auto">
-
+        {/* Header Section */}
         <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-slate-900 pb-6">
           <div className="flex items-center gap-3">
             <Swords className="w-8 h-8 text-cyan-500 animate-pulse" />
@@ -228,7 +247,6 @@ const GamePage = () => {
               </p>
             </div>
           </div>
-
 
           <div className="flex items-center gap-4">
             {isFinished ? (
@@ -249,8 +267,8 @@ const GamePage = () => {
             )}
 
             <button
-              onClick={() => navigate("/lobby")}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-rose-955/20 hover:border-rose-900/40 text-slate-400 hover:text-rose-450 hover:text-rose-400 transition duration-300"
+              onClick={handleRetreat} // handleRetreat ফাংশন কল করা হয়েছে
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-rose-950/20 hover:border-rose-900/40 text-slate-400 hover:text-rose-400 transition duration-300"
             >
               <LogOut className="w-4 h-4" />
               <span className="hidden sm:inline">Retreat</span>
@@ -258,7 +276,7 @@ const GamePage = () => {
           </div>
         </header>
 
-
+        {/* Victory/Defeat Banner */}
         {isFinished && (
           <div className="mb-8 p-6 rounded-3xl bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-amber-500/10 border border-amber-500/30 text-center shadow-[0_0_30px_rgba(245,158,11,0.05)]">
             <Trophy className="w-12 h-12 text-amber-400 mx-auto mb-2 animate-bounce" />
@@ -273,7 +291,7 @@ const GamePage = () => {
           </div>
         )}
 
-
+        {/* Players Info Cards */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div
             className={`p-4 rounded-2xl border transition duration-300 ${!isFinished && isMyTurn ? "bg-cyan-500/5 border-cyan-500/25" : "bg-slate-900/50 border-slate-800/60"}`}
@@ -295,9 +313,9 @@ const GamePage = () => {
           </div>
         </div>
 
-
+        {/* Battlefield Grids */}
         <div className="grid lg:grid-cols-2 gap-10">
-
+          {/* Radar Board (Attacks) */}
           <div className="bg-slate-900/40 border border-slate-800/80 p-6 rounded-3xl relative overflow-hidden backdrop-blur-md">
             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -z-10"></div>
             <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
@@ -352,13 +370,14 @@ const GamePage = () => {
                             cell === "hit" ||
                             cell === "miss"
                           }
-                          className={`w-8 h-8 border flex items-center justify-center text-xs font-mono rounded-md transition-all duration-200 cursor-crosshair ${getCellColor(cell, true)} ${!isFinished &&
-                              isMyTurn &&
-                              cell !== "hit" &&
-                              cell !== "miss"
+                          className={`w-8 h-8 border flex items-center justify-center text-xs font-mono rounded-md transition-all duration-200 cursor-crosshair ${getCellColor(cell, true)} ${
+                            !isFinished &&
+                            isMyTurn &&
+                            cell !== "hit" &&
+                            cell !== "miss"
                               ? "hover:border-cyan-400 hover:shadow-[0_0_8px_rgba(6,182,212,0.4)]"
                               : "disabled:opacity-80"
-                            }`}
+                          }`}
                         >
                           {getCellContent(cell, true)}
                         </button>
@@ -370,7 +389,7 @@ const GamePage = () => {
             </div>
           </div>
 
-
+          {/* Fleet Board (Defense) */}
           <div className="bg-slate-900/40 border border-slate-800/80 p-6 rounded-3xl relative overflow-hidden backdrop-blur-md">
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl -z-10"></div>
             <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
@@ -431,7 +450,7 @@ const GamePage = () => {
           </div>
         </div>
 
-
+        {/* Legend */}
         <footer className="mt-10 bg-slate-900/20 border border-slate-800/60 p-4 rounded-2xl flex flex-wrap justify-center gap-6 text-sm text-slate-400 font-mono">
           <div className="flex items-center gap-2">
             <span className="w-4 h-4 border border-slate-800 bg-slate-950 rounded-sm"></span>
