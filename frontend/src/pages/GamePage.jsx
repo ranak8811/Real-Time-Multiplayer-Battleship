@@ -1,10 +1,17 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useUser } from "../context/UserContext";
-import { getSessionById } from "../services/sessionService";
+import { getSessionById, fireShot } from "../services/sessionService";
 import { socket } from "../services/socketService";
 import { toast } from "react-toastify";
-import { Shield, Crosshair, Swords, LogOut, Loader2 } from "lucide-react";
+import {
+  Shield,
+  Crosshair,
+  Swords,
+  LogOut,
+  Loader2,
+  Trophy,
+} from "lucide-react";
 
 const GamePage = () => {
   const { sessionId } = useParams();
@@ -15,11 +22,12 @@ const GamePage = () => {
   const [playerRole, setPlayerRole] = useState(null);
   const navigate = useNavigate();
 
+
   const loadGameDetails = async () => {
     try {
       const data = await getSessionById(sessionId);
       if (!data || !data.session) {
-        toast.error("Failed to load battle room session");
+        toast.error("Failed to load session details");
         navigate("/lobby");
         return;
       }
@@ -33,7 +41,7 @@ const GamePage = () => {
       }
     } catch (error) {
       console.error(error);
-      toast.error("Error loading battlefield settings");
+      toast.error("Error loading battlefield");
       navigate("/lobby");
     } finally {
       setLoading(false);
@@ -46,6 +54,7 @@ const GamePage = () => {
     }
   }, [user, sessionId]);
 
+
   useEffect(() => {
     if (!session || !user) return;
 
@@ -54,21 +63,74 @@ const GamePage = () => {
       userId: user.userId,
     });
 
-    console.log("[Socket] Reconnected to battlefield room:", session.roomCode);
+    console.log("[Socket] Joined battlefield room:", session.roomCode);
 
-    socket.on("game-updated", (updatedState) => {
-      console.log("[Socket Event] Game State Updated:", updatedState);
-      setGameState(updatedState);
+
+    socket.on("shot-fired", (data) => {
+      console.log("[Socket Event] Shot Fired Received:", data);
+
+
+      setGameState(data.gameState);
+
+      const colLetter = String.fromCharCode(65 + data.col);
+      const rowNumber = data.row + 1;
+      const isAttacker = data.attackerId === user.userId;
+
+
+      if (data.result === "hit") {
+        if (isAttacker) {
+          toast.success(
+            `DIRECT HIT! Targeted coordinates ${colLetter}${rowNumber} successfully! 💥`,
+          );
+          if (data.sunkShip) {
+            toast.info(
+              `SHIP SUNK! You annihilated opponent's ${data.sunkShip.split("_")[0].toUpperCase()}! 🚢`,
+            );
+          }
+        } else {
+          toast.error(
+            `FLEET UNDER ATTACK! Opponent struck your grid at ${colLetter}${rowNumber}! 💥`,
+          );
+          if (data.sunkShip) {
+            toast.error(
+              `WARSHIP LOST! Your ${data.sunkShip.split("_")[0].toUpperCase()} has been sunk! 🚨`,
+            );
+          }
+        }
+      } else {
+        if (isAttacker) {
+          toast.info(
+            `Missed! Shot splashed into water at ${colLetter}${rowNumber}. 💧`,
+          );
+        } else {
+          toast.success(
+            `Splash! Opponent missed target at ${colLetter}${rowNumber}. 💧`,
+          );
+        }
+      }
+
+
+      if (data.winnerId) {
+        if (data.winnerId === user.userId) {
+          toast.success("VICTORY! You have destroyed the entire enemy fleet!", {
+            autoClose: false,
+          });
+        } else {
+          toast.error("DEFEAT! All your warships have been sunk!", {
+            autoClose: false,
+          });
+        }
+      }
     });
 
     return () => {
-      socket.off("game-updated");
+      socket.off("shot-fired");
     };
   }, [session?.roomCode, user?.userId]);
 
   if (contextLoading || loading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
+      <div className="min-h-screen bg-slate-955 text-white flex items-center justify-center">
         <Loader2 className="w-10 h-10 animate-spin text-cyan-500" />
       </div>
     );
@@ -77,10 +139,12 @@ const GamePage = () => {
   if (!session || !gameState) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center gap-4">
-        <p className="text-slate-400">Battlefield is not initialized yet.</p>
+        <p className="text-slate-400">
+          Battlefield status not loaded properly.
+        </p>
         <button
           onClick={() => navigate("/lobby")}
-          className="px-6 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl transition duration-300"
+          className="px-6 py-2 bg-slate-800 rounded-xl"
         >
           Return to Lobby
         </button>
@@ -104,30 +168,33 @@ const GamePage = () => {
       : session.ownerId.displayName;
 
   const isMyTurn = gameState.currentTurn === user.userId;
+  const isFinished = gameState.gameStatus === "finished";
 
-  const handleCellAttack = (row, col) => {
+
+  const handleCellAttack = async (row, col) => {
+    if (isFinished) return;
     if (!isMyTurn) {
-      toast.warning("It's not your turn to strike!");
+      toast.warning("It's not your turn to fire!");
       return;
     }
     const cellValue = opponentBoard[row][col];
     if (cellValue === "hit" || cellValue === "miss") {
-      toast.warning("Coordinates already targeted!");
+      toast.warning("Target coordinate has already been struck!");
       return;
     }
 
-    const colLetter = String.fromCharCode(65 + col);
-    const rowNumber = row + 1;
-    toast.info(
-      `Targeting Coordinate: ${colLetter}${rowNumber} (Attack API integrated in next step!)`,
-    );
+    try {
+      await fireShot(sessionId, user.userId, row, col);
+    } catch (error) {
+      toast.error(error);
+    }
   };
 
   const getCellColor = (cell, isRadar) => {
     switch (cell) {
       case "ship":
         return isRadar
-          ? "bg-slate-955/50 hover:bg-slate-900 border-slate-900"
+          ? "bg-slate-950 hover:bg-slate-900 border-slate-900"
           : "bg-cyan-500/20 border-cyan-500/50 text-cyan-400 shadow-[inset_0_0_10px_rgba(6,182,212,0.15)]";
       case "hit":
         return "bg-rose-600/30 border-rose-500 text-rose-400 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.25)]";
@@ -146,8 +213,9 @@ const GamePage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-4 md:p-8 font-sans selection:bg-cyan-500/30">
+    <div className="min-h-screen bg-slate-955 bg-slate-950 text-white p-4 md:p-8 font-sans selection:bg-cyan-500/30">
       <div className="max-w-6xl mx-auto">
+
         <header className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4 border-b border-slate-900 pb-6">
           <div className="flex items-center gap-3">
             <Swords className="w-8 h-8 text-cyan-500 animate-pulse" />
@@ -161,14 +229,20 @@ const GamePage = () => {
             </div>
           </div>
 
+
           <div className="flex items-center gap-4">
-            {isMyTurn ? (
+            {isFinished ? (
+              <div className="flex items-center gap-2 px-5 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-bold shadow-[0_0_15px_rgba(245,158,11,0.1)]">
+                <Trophy className="w-5 h-5 text-amber-550" />
+                <span>MATCH FINISHED</span>
+              </div>
+            ) : isMyTurn ? (
               <div className="flex items-center gap-2 px-5 py-2 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-bold shadow-[0_0_15px_rgba(6,182,212,0.1)] animate-pulse">
                 <Crosshair className="w-4 h-4 animate-spin-slow" />
                 <span>YOUR TURN TO ATTACK</span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 px-5 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-550 text-amber-400 font-bold">
+              <div className="flex items-center gap-2 px-5 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold">
                 <Shield className="w-4 h-4" />
                 <span>OPPONENT DEFENDING...</span>
               </div>
@@ -176,7 +250,7 @@ const GamePage = () => {
 
             <button
               onClick={() => navigate("/lobby")}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-rose-950/20 hover:border-rose-900/40 text-slate-400 hover:text-rose-400 transition duration-300"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-rose-955/20 hover:border-rose-900/40 text-slate-400 hover:text-rose-450 hover:text-rose-400 transition duration-300"
             >
               <LogOut className="w-4 h-4" />
               <span className="hidden sm:inline">Retreat</span>
@@ -184,9 +258,25 @@ const GamePage = () => {
           </div>
         </header>
 
+
+        {isFinished && (
+          <div className="mb-8 p-6 rounded-3xl bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-amber-500/10 border border-amber-500/30 text-center shadow-[0_0_30px_rgba(245,158,11,0.05)]">
+            <Trophy className="w-12 h-12 text-amber-400 mx-auto mb-2 animate-bounce" />
+            <h2 className="text-xl font-bold text-amber-300">
+              {gameState.winner === user.userId
+                ? "YOU ARE VICTORIOUS!"
+                : "YOU HAVE BEEN DEFEATED!"}
+            </h2>
+            <p className="text-xs text-slate-400 mt-1 uppercase font-mono tracking-widest">
+              Winner: {gameState.winner === user.userId ? myName : opponentName}
+            </p>
+          </div>
+        )}
+
+
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div
-            className={`p-4 rounded-2xl border transition duration-300 ${isMyTurn ? "bg-cyan-500/5 border-cyan-500/25" : "bg-slate-900/50 border-slate-800/60"}`}
+            className={`p-4 rounded-2xl border transition duration-300 ${!isFinished && isMyTurn ? "bg-cyan-500/5 border-cyan-500/25" : "bg-slate-900/50 border-slate-800/60"}`}
           >
             <span className="text-xs text-slate-500 uppercase tracking-widest font-mono">
               Player 1 (You)
@@ -194,7 +284,7 @@ const GamePage = () => {
             <h3 className="text-lg font-bold text-slate-200 mt-1">{myName}</h3>
           </div>
           <div
-            className={`p-4 rounded-2xl border transition duration-300 ${!isMyTurn ? "bg-amber-500/5 border-amber-500/25" : "bg-slate-900/50 border-slate-800/60"}`}
+            className={`p-4 rounded-2xl border transition duration-300 ${!isFinished && !isMyTurn ? "bg-amber-500/5 border-amber-500/25" : "bg-slate-900/50 border-slate-800/60"}`}
           >
             <span className="text-xs text-slate-500 uppercase tracking-widest font-mono">
               Player 2 (Opponent)
@@ -205,7 +295,9 @@ const GamePage = () => {
           </div>
         </div>
 
+
         <div className="grid lg:grid-cols-2 gap-10">
+
           <div className="bg-slate-900/40 border border-slate-800/80 p-6 rounded-3xl relative overflow-hidden backdrop-blur-md">
             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -z-10"></div>
             <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
@@ -255,9 +347,15 @@ const GamePage = () => {
                           key={`${rIdx}-${cIdx}`}
                           onClick={() => handleCellAttack(rIdx, cIdx)}
                           disabled={
-                            !isMyTurn || cell === "hit" || cell === "miss"
+                            isFinished ||
+                            !isMyTurn ||
+                            cell === "hit" ||
+                            cell === "miss"
                           }
-                          className={`w-8 h-8 border flex items-center justify-center text-xs font-mono rounded-md transition-all duration-200 cursor-crosshair ${getCellColor(cell, true)} ${isMyTurn && cell !== "hit" && cell !== "miss"
+                          className={`w-8 h-8 border flex items-center justify-center text-xs font-mono rounded-md transition-all duration-200 cursor-crosshair ${getCellColor(cell, true)} ${!isFinished &&
+                              isMyTurn &&
+                              cell !== "hit" &&
+                              cell !== "miss"
                               ? "hover:border-cyan-400 hover:shadow-[0_0_8px_rgba(6,182,212,0.4)]"
                               : "disabled:opacity-80"
                             }`}
@@ -271,6 +369,7 @@ const GamePage = () => {
               </div>
             </div>
           </div>
+
 
           <div className="bg-slate-900/40 border border-slate-800/80 p-6 rounded-3xl relative overflow-hidden backdrop-blur-md">
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl -z-10"></div>
@@ -331,6 +430,7 @@ const GamePage = () => {
             </div>
           </div>
         </div>
+
 
         <footer className="mt-10 bg-slate-900/20 border border-slate-800/60 p-4 rounded-2xl flex flex-wrap justify-center gap-6 text-sm text-slate-400 font-mono">
           <div className="flex items-center gap-2">

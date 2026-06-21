@@ -61,6 +61,23 @@ export const placeShips = async (sessionId, userId, ships) => {
     return response.data;
   } catch (error) {
     console.error("Error in placeShips service:", error);
-    throw error.response?.data?.message || "Failed to submit ship placements";
+    toast.error(
+      error.response?.data?.message || "Failed to submit ship placements",
+    );
+  }
+};
+
+export const fireShot = async (sessionId, userId, row, col) => {
+  try {
+    const response = await axiosClient.post("/sessions/fire-shot", {
+      sessionId,
+      userId,
+      row,
+      col,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error in fireShot service:", error);
+    toast.error(error.response?.data?.message || "Failed to fire strike");
   }
 };
