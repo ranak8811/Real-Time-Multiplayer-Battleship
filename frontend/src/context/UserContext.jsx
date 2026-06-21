@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { connectSocket, disconnectSocket } from "../services/socketService";
 
 const UserContext = createContext();
 
@@ -11,7 +12,10 @@ export const UserProvider = ({ children }) => {
 
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+
+        connectSocket(parsedUser.userId);
       } catch (error) {
         console.error("Error parsing saved user from localStorage:", error);
         localStorage.removeItem("battleship_user");
@@ -23,11 +27,15 @@ export const UserProvider = ({ children }) => {
   const loginUser = (userData) => {
     setUser(userData);
     localStorage.setItem("battleship_user", JSON.stringify(userData));
+
+    connectSocket(userData.userId);
   };
 
   const logoutUser = () => {
     setUser(null);
     localStorage.removeItem("battleship_user");
+
+    disconnectSocket();
   };
 
   return (

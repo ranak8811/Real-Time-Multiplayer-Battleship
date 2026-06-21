@@ -67,7 +67,7 @@ const CreateGamePage = () => {
                   disabled={loading}
                   className={`py-3.5 rounded-xl font-bold border transition duration-300 transform active:scale-95 ${
                     gridSize === size
-                      ? "bg-cyan-500/10 border-cyan-500 text-cyan-400 shadow-md shadow-cyan-950/20" // সিলেক্টেড স্টাইল
+                      ? "bg-cyan-500/10 border-cyan-500 text-cyan-400 shadow-md shadow-cyan-950/20"
                       : "bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-400"
                   }`}
                 >
