@@ -61,6 +61,8 @@ const GamePage = () => {
       userId: user.userId,
     });
 
+    console.log("[Socket] Joined battlefield room:", session.roomCode);
+
     socket.on("shot-fired", (data) => {
       setGameState(data.gameState);
 
@@ -170,6 +172,9 @@ const GamePage = () => {
   const isMyTurn = gameState.currentTurn === user.userId;
   const isFinished = gameState.gameStatus === "finished";
 
+  const myShips = gameState[`${myRole}Ships`] || [];
+  const opponentShips = gameState[`${opponentRole}Ships`] || [];
+
   const handleCellAttack = async (row, col) => {
     if (isFinished) return;
     if (!isMyTurn) {
@@ -202,6 +207,90 @@ const GamePage = () => {
       });
     }
     navigate("/lobby");
+  };
+
+  const getShipStatus = (ships) => {
+    const defaultShips = [
+      { name: "Carrier", size: 5, hits: 0, sunk: false, shipId: "carrier_1" },
+      {
+        name: "Battleship #1",
+        size: 4,
+        hits: 0,
+        sunk: false,
+        shipId: "battleship_1",
+      },
+      {
+        name: "Battleship #2",
+        size: 4,
+        hits: 0,
+        sunk: false,
+        shipId: "battleship_2",
+      },
+      {
+        name: "Destroyer #1",
+        size: 3,
+        hits: 0,
+        sunk: false,
+        shipId: "destroyer_1",
+      },
+      {
+        name: "Destroyer #2",
+        size: 3,
+        hits: 0,
+        sunk: false,
+        shipId: "destroyer_2",
+      },
+      {
+        name: "Destroyer #3",
+        size: 3,
+        hits: 0,
+        sunk: false,
+        shipId: "destroyer_3",
+      },
+      {
+        name: "Patrol Boat #1",
+        size: 2,
+        hits: 0,
+        sunk: false,
+        shipId: "patrolBoat_1",
+      },
+      {
+        name: "Patrol Boat #2",
+        size: 2,
+        hits: 0,
+        sunk: false,
+        shipId: "patrolBoat_2",
+      },
+      {
+        name: "Patrol Boat #3",
+        size: 2,
+        hits: 0,
+        sunk: false,
+        shipId: "patrolBoat_3",
+      },
+      {
+        name: "Patrol Boat #4",
+        size: 2,
+        hits: 0,
+        sunk: false,
+        shipId: "patrolBoat_4",
+      },
+    ];
+
+    if (!ships || ships.length === 0) return defaultShips;
+
+    return ships.map((ship) => {
+      const type = ship.shipId.split("_")[0];
+      const suffix = ship.shipId.split("_")[1];
+      const formattedName = `${type.charAt(0).toUpperCase() + type.slice(1).replace("Boat", " Boat")} #${suffix}`;
+      return {
+        shipId: ship.shipId,
+        name: formattedName,
+        size: ship.size,
+        hits: ship.hits.length,
+        sunk: ship.hits.length === ship.size,
+      };
+    });
   };
 
   const getCellColor = (cell, isRadar) => {
@@ -263,7 +352,7 @@ const GamePage = () => {
 
             <button
               onClick={handleRetreat}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-rose-950/20 hover:border-rose-900/40 text-slate-400 hover:text-rose-400 transition duration-300"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-rose-950/20 hover:border-rose-900/40 text-slate-400 hover:text-rose-450 hover:text-rose-400 transition duration-300"
             >
               <LogOut className="w-4 h-4" />
               <span className="hidden sm:inline">Retreat</span>
@@ -282,7 +371,6 @@ const GamePage = () => {
             <p className="text-xs text-slate-400 mt-1 uppercase font-mono tracking-widest">
               Winner: {gameState.winner === user.userId ? myName : opponentName}
             </p>
-
             <button
               onClick={() => navigate("/lobby")}
               className="mt-4 px-6 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-bold rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.1)] transition duration-300 hover:scale-105"
@@ -314,7 +402,7 @@ const GamePage = () => {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-10">
-          <div className="bg-slate-900/40 border border-slate-800/80 p-6 rounded-3xl relative overflow-hidden backdrop-blur-md">
+          <div className="bg-slate-900/40 border border-slate-800/80 p-6 rounded-3xl relative overflow-hidden backdrop-blur-md flex flex-col">
             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -z-10"></div>
             <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
               <h2 className="font-extrabold text-lg text-cyan-400 uppercase tracking-wider flex items-center gap-2">
@@ -326,7 +414,43 @@ const GamePage = () => {
               </span>
             </div>
 
-            <div className="flex justify-center items-center">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6 bg-slate-950/40 border border-slate-800/40 p-3 rounded-2xl">
+              {getShipStatus(opponentShips).map((ship) => (
+                <div
+                  key={ship.shipId}
+                  className={`p-2 rounded-xl border flex flex-col gap-1 relative overflow-hidden ${
+                    ship.sunk
+                      ? "bg-rose-950/10 border-rose-900/30 opacity-40"
+                      : "bg-slate-900/40 border-slate-800/50"
+                  }`}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] font-bold text-slate-400 truncate">
+                      {ship.name.split(" ")[0]}
+                    </span>
+                    {ship.sunk && (
+                      <span className="text-[8px] font-black text-rose-500 animate-pulse font-mono">
+                        SUNK
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-0.5 mt-0.5">
+                    {Array.from({ length: ship.size }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={`h-1.5 flex-1 rounded-sm ${
+                          i < ship.hits
+                            ? "bg-rose-500 shadow-[0_0_5px_rgba(239,68,68,0.6)]"
+                            : "bg-slate-700"
+                        }`}
+                      ></span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-center items-center flex-1">
               <div className="relative overflow-x-auto">
                 <div className="flex pl-6 mb-1">
                   {Array.from({ length: session.gridSize }).map((_, i) => (
@@ -387,11 +511,11 @@ const GamePage = () => {
             </div>
           </div>
 
-          <div className="bg-slate-900/40 border border-slate-800/80 p-6 rounded-3xl relative overflow-hidden backdrop-blur-md">
+          <div className="bg-slate-900/40 border border-slate-800/80 p-6 rounded-3xl relative overflow-hidden backdrop-blur-md flex flex-col">
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl -z-10"></div>
             <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
               <h2 className="font-extrabold text-lg text-amber-500 uppercase tracking-wider flex items-center gap-2">
-                <Shield className="w-5 h-5 text-amber-550" /> Fleet Board
+                <Shield className="w-5 h-5 text-amber-500" /> Fleet Board
                 (Defense)
               </h2>
               <span className="text-xs text-slate-500 font-mono">
@@ -399,7 +523,43 @@ const GamePage = () => {
               </span>
             </div>
 
-            <div className="flex justify-center items-center">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6 bg-slate-950/40 border border-slate-800/40 p-3 rounded-2xl">
+              {getShipStatus(myShips).map((ship) => (
+                <div
+                  key={ship.shipId}
+                  className={`p-2 rounded-xl border flex flex-col gap-1 relative overflow-hidden ${
+                    ship.sunk
+                      ? "bg-rose-955/10 border-rose-900/30 opacity-40"
+                      : "bg-slate-900/40 border-slate-800/50"
+                  }`}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] font-bold text-slate-400 truncate">
+                      {ship.name.split(" ")[0]}
+                    </span>
+                    {ship.sunk && (
+                      <span className="text-[8px] font-black text-rose-500 animate-pulse font-mono">
+                        SUNK
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-0.5 mt-0.5">
+                    {Array.from({ length: ship.size }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={`h-1.5 flex-1 rounded-sm ${
+                          i < ship.hits
+                            ? "bg-rose-500 shadow-[0_0_5px_rgba(239,68,68,0.6)]"
+                            : "bg-cyan-500/40 shadow-[0_0_3px_rgba(6,182,212,0.2)]"
+                        }`}
+                      ></span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-center items-center flex-1">
               <div className="relative overflow-x-auto">
                 <div className="flex pl-6 mb-1">
                   {Array.from({ length: session.gridSize }).map((_, i) => (
