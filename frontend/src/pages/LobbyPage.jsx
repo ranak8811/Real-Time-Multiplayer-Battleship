@@ -2,12 +2,22 @@ import { useEffect, useState } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useUser } from "../context/UserContext";
 import { getSessions, joinSession } from "../services/sessionService";
+import { getUserDetails } from "../services/userService";
 import { toast } from "react-toastify";
-import { RefreshCw, Play, LogOut } from "lucide-react";
+import {
+  RefreshCw,
+  Play,
+  LogOut,
+  Trophy,
+  Award,
+  ShieldAlert,
+  Activity,
+} from "lucide-react";
 
 const LobbyPage = () => {
   const { user, loading: contextLoading, logoutUser } = useUser();
   const [sessions, setSessions] = useState([]);
+  const [profileStats, setProfileStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -23,9 +33,21 @@ const LobbyPage = () => {
     }
   };
 
+  const fetchProfileStats = async () => {
+    try {
+      const data = await getUserDetails(user.userId);
+      if (data.success) {
+        setProfileStats(data.user);
+      }
+    } catch (error) {
+      console.error("Error fetching profile details:", error);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       fetchRooms();
+      fetchProfileStats();
     }
   }, [user]);
 
@@ -45,7 +67,6 @@ const LobbyPage = () => {
     try {
       const data = await joinSession(roomCode, user.userId);
       toast.success(data.message || "Joined room successfully!");
-
       navigate(`/place-ships/${data.session.sessionId}`);
     } catch (error) {
       toast.error(error);
@@ -61,6 +82,7 @@ const LobbyPage = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-white p-6">
       <div className="max-w-6xl mx-auto">
+        {/* Header Section */}
         <header className="flex justify-between items-center mb-8 pb-6 border-b border-slate-900">
           <div>
             <h1 className="text-3xl font-extrabold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
@@ -76,7 +98,10 @@ const LobbyPage = () => {
 
           <div className="flex gap-4">
             <button
-              onClick={fetchRooms}
+              onClick={() => {
+                fetchRooms();
+                fetchProfileStats();
+              }}
               disabled={loading}
               className="bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 p-2.5 rounded-xl transition duration-300 disabled:opacity-50"
             >
@@ -100,6 +125,62 @@ const LobbyPage = () => {
             </button>
           </div>
         </header>
+
+        {profileStats && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 bg-slate-900 border border-slate-800 p-6 rounded-2xl relative overflow-hidden shadow-xl">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -z-10"></div>
+
+            <div className="bg-slate-950/50 border border-slate-900/60 p-4 rounded-xl flex items-center gap-3">
+              <Activity className="w-8 h-8 text-slate-400" />
+              <div className="flex flex-col">
+                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">
+                  Battles
+                </span>
+                <span className="text-xl font-bold text-slate-200 mt-0.5 font-mono">
+                  {profileStats.gamesPlayed}
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/50 border border-slate-900/60 p-4 rounded-xl flex items-center gap-3">
+              <Trophy className="w-8 h-8 text-emerald-500" />
+              <div className="flex flex-col">
+                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">
+                  Wins
+                </span>
+                <span className="text-xl font-bold text-emerald-400 mt-0.5 font-mono">
+                  {profileStats.wins}
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/50 border border-slate-900/60 p-4 rounded-xl flex items-center gap-3">
+              <ShieldAlert className="w-8 h-8 text-rose-500" />
+              <div className="flex flex-col">
+                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">
+                  Losses
+                </span>
+                <span className="text-xl font-bold text-rose-400 mt-0.5 font-mono">
+                  {profileStats.losses}
+                </span>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/50 border border-slate-900/60 p-4 rounded-xl flex items-center gap-3">
+              <Award className="w-8 h-8 text-cyan-500 animate-pulse" />
+              <div className="flex flex-col">
+                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">
+                  Win Rate
+                </span>
+                <span className="text-xl font-bold text-cyan-400 mt-0.5 font-mono">
+                  {profileStats.gamesPlayed > 0
+                    ? `${Math.round((profileStats.wins / profileStats.gamesPlayed) * 100)}%`
+                    : "0%"}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         <main>
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">

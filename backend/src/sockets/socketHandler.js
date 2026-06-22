@@ -1,5 +1,6 @@
 import GameSession from "../models/GameSession.js";
 import GameState from "../models/GameState.js";
+import User from "../models/User.js";
 
 const handlePlayerExit = async (userId, roomCode, io) => {
   try {
@@ -37,6 +38,15 @@ const handlePlayerExit = async (userId, roomCode, io) => {
       gameState.winner = winnerId;
 
       await gameState.save();
+
+      await User.findByIdAndUpdate(winnerId, {
+        $inc: { wins: 1, gamesPlayed: 1 },
+      });
+
+      const loserId = userId;
+      await User.findByIdAndUpdate(loserId, {
+        $inc: { losses: 1, gamesPlayed: 1 },
+      });
 
       console.log(
         `[Socket Game Over] Winner by forfeit: ${winnerId} in Room: ${formattedRoom}`,

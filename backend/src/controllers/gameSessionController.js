@@ -542,6 +542,19 @@ export const fireShot = async (req, res) => {
       gameState.winner = userId;
       session.status = "finished";
       await session.save();
+
+      await User.findByIdAndUpdate(userId, {
+        $inc: { wins: 1, gamesPlayed: 1 },
+      });
+
+      const loserId =
+        session.ownerId.toString() === userId.toString()
+          ? session.opponentId
+          : session.ownerId;
+
+      await User.findByIdAndUpdate(loserId, {
+        $inc: { losses: 1, gamesPlayed: 1 },
+      });
     } else {
       gameState.currentTurn =
         attackerRole === "player1" ? session.opponentId : session.ownerId;
