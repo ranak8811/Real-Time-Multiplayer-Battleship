@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   Activity,
   Medal,
+  HelpCircle,
 } from "lucide-react";
 
 const LobbyPage = () => {
@@ -117,6 +118,14 @@ const LobbyPage = () => {
           </div>
 
           <div className="flex gap-4">
+            <button
+              onClick={() => navigate("/rules")}
+              className="bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-300 p-2.5 rounded-xl transition duration-300"
+              title="How to Play & Rules"
+            >
+              <HelpCircle className="w-5 h-5" />
+            </button>
+
             <button
               onClick={() => {
                 fetchRooms();

@@ -3,7 +3,7 @@ import { useUser } from "../context/UserContext";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { registerUser, loginUserByName } from "../services/userService";
-import { Swords, UserPlus, LogIn } from "lucide-react";
+import { Swords, UserPlus, LogIn, HelpCircle } from "lucide-react";
 
 const NamePage = () => {
   const [name, setName] = useState("");
@@ -129,6 +129,17 @@ const NamePage = () => {
                 : "Access Station"}
           </button>
         </form>
+        
+        <div className="mt-6 text-center border-t border-slate-800/40 pt-4">
+          <button
+            type="button"
+            onClick={() => navigate("/rules")}
+            className="inline-flex items-center gap-2 text-xs text-slate-500 hover:text-cyan-400 font-mono transition duration-300"
+          >
+            <HelpCircle className="w-4 h-4" />
+            <span>HOW TO PLAY & GAME RULES</span>
+          </button>
+        </div>
       </div>
     </div>
   );

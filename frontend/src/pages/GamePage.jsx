@@ -4,6 +4,7 @@ import { useUser } from "../context/UserContext";
 import { getSessionById, fireShot } from "../services/sessionService";
 import { socket } from "../services/socketService";
 import { toast } from "react-toastify";
+import Swal from "sweetalert2";
 import {
   Shield,
   Crosshair,
@@ -196,17 +197,35 @@ const GamePage = () => {
 
   const handleRetreat = () => {
     if (!isFinished) {
-      const confirmRetreat = window.confirm(
-        "Are you sure you want to retreat? This will count as a forfeit and you will lose the match!",
-      );
-      if (!confirmRetreat) return;
-
-      socket.emit("leave-room", {
-        roomCode: session.roomCode,
-        userId: user.userId,
+      Swal.fire({
+        title: "Retreat Match?",
+        text: "Are you sure you want to retreat? This will count as a forfeit and you will lose the match!",
+        icon: "warning",
+        iconColor: "#f43f5e", // slate/rose color matching the theme
+        showCancelButton: true,
+        confirmButtonText: "Yes, Retreat",
+        cancelButtonText: "Cancel",
+        confirmButtonColor: "#e11d48", // rose-600
+        cancelButtonColor: "#334155",  // slate-700
+        background: "#090d16",         // matches the dark theme (slate-950)
+        color: "#f8fafc",              // slate-50
+        customClass: {
+          popup: "border border-slate-800 rounded-3xl",
+          confirmButton: "rounded-xl font-bold uppercase tracking-wider px-6 py-2.5",
+          cancelButton: "rounded-xl font-bold uppercase tracking-wider px-6 py-2.5"
+        }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          socket.emit("leave-room", {
+            roomCode: session.roomCode,
+            userId: user.userId,
+          });
+          navigate("/lobby");
+        }
       });
+    } else {
+      navigate("/lobby");
     }
-    navigate("/lobby");
   };
 
   const getShipStatus = (ships) => {

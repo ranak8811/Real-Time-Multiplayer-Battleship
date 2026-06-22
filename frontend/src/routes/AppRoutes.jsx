@@ -4,6 +4,7 @@ import LobbyPage from "../pages/LobbyPage";
 import CreateGamePage from "../pages/CreateGamePage";
 import ShipPlacementPage from "../pages/ShipPlacementPage";
 import GamePage from "../pages/GamePage";
+import RulesPage from "../pages/RulesPage";
 
 const AppRoutes = () => {
   return (
@@ -21,10 +22,14 @@ const AppRoutes = () => {
       {/* ৫. ডাইনামিক সেশন আইডি সহ গেম খেলার মূল পেজ */}
       <Route path="/game/:sessionId" element={<GamePage />} />
 
-      {/* ৬. ম্যাচ না করা যেকোনো ইউআরএল-এর জন্য হোম পেজে রিডাইরেক্ট করা */}
+      {/* ৬. গেম খেলার নিয়ম পেজ */}
+      <Route path="/rules" element={<RulesPage />} />
+
+      {/* ৭. ম্যাচ না করা যেকোনো ইউআরএল-এর জন্য হোম পেজে রিডাইরেক্ট করা */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 };
 
 export default AppRoutes;
+
