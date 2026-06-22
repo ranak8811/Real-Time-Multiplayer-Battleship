@@ -25,10 +25,8 @@ const CreateGamePage = () => {
 
   const handleHostGame = async () => {
     setLoading(true);
-
     try {
       const response = await createSession(user.userId, gridSize);
-
       toast.success(`Room created successfully! Code: ${response.roomCode}`);
       navigate(`/place-ships/${response.sessionId}`);
     } catch (error) {
@@ -44,7 +42,7 @@ const CreateGamePage = () => {
         <button
           onClick={() => navigate("/lobby")}
           disabled={loading}
-          className="absolute top-6 left-6 text-slate-500 hover:text-slate-300 transition duration-300 disabled:opacity-50"
+          className="absolute top-6 left-6 text-slate-500 hover:text-slate-350 transition duration-300 disabled:opacity-50"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -58,14 +56,15 @@ const CreateGamePage = () => {
             <label className="block text-sm font-semibold mb-3 text-slate-400">
               Select Grid Size
             </label>
-            <div className="grid grid-cols-4 gap-3">
-              {[8, 10, 12, 15].map((size) => (
+            <div className="grid grid-cols-5 gap-2">
+              {" "}
+              {[5, 8, 10, 12, 15].map((size) => (
                 <button
                   key={size}
                   type="button"
                   onClick={() => setGridSize(size)}
                   disabled={loading}
-                  className={`py-3.5 rounded-xl font-bold border transition duration-300 transform active:scale-95 ${
+                  className={`py-3 rounded-xl font-bold border transition duration-300 transform active:scale-95 text-xs ${
                     gridSize === size
                       ? "bg-cyan-500/10 border-cyan-500 text-cyan-400 shadow-md shadow-cyan-950/20"
                       : "bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-400"
@@ -79,30 +78,54 @@ const CreateGamePage = () => {
 
           <div className="bg-slate-950 border border-slate-800/80 p-5 rounded-xl text-sm text-slate-400 space-y-2">
             <h3 className="font-semibold text-slate-300 mb-1">
-              Standard Fleet Rules:
+              {gridSize === 5
+                ? "Fast Fleet Rules (5x5 Grid):"
+                : "Standard Fleet Rules:"}
             </h3>
-            <div className="flex justify-between">
-              <span>Carrier (Size 5)</span>
-              <span>1x</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Battleship (Size 4)</span>
-              <span>2x</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Destroyer (Size 3)</span>
-              <span>3x</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Patrol Boat (Size 2)</span>
-              <span>4x</span>
-            </div>
+            {gridSize === 5 ? (
+              <>
+                <div className="flex justify-between">
+                  <span>Destroyer (Size 3)</span>
+                  <span>1x</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Patrol Boat (Size 2)</span>
+                  <span>2x</span>
+                </div>
+                <p className="text-[10px] text-amber-500/80 mt-2 font-mono">
+                  * Must place at least 2 ships to lock in.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span>Carrier (Size 5)</span>
+                  <span>1x</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Battleship (Size 4)</span>
+                  <span>2x</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Destroyer (Size 3)</span>
+                  <span>3x</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Patrol Boat (Size 2)</span>
+                  <span>4x</span>
+                </div>
+                <p className="text-[10px] text-amber-500/80 mt-2 font-mono">
+                  * Must place at least 2 ships to lock in.
+                </p>
+              </>
+            )}
           </div>
+
           <div className="pt-4 border-t border-slate-800">
             <button
               onClick={handleHostGame}
               disabled={loading}
-              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-cyan-950/20 transform active:scale-95 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-cyan-950/20 transform active:scale-95 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm uppercase tracking-wider"
             >
               {loading ? "Creating Session..." : "Host Match"}
             </button>

@@ -5,14 +5,21 @@ export const validateShipPlacement = (ships, gridSize, shipConfig) => {
     submittedCounts[type] = (submittedCounts[type] || 0) + 1;
   }
 
+  if (ships.length < 2) {
+    return {
+      isValid: false,
+      message: "Incorrect number of ships. You must place at least 2 ships.",
+    };
+  }
+
   const configKeys = Object.keys(shipConfig);
   for (const key of configKeys) {
     const expected = shipConfig[key];
     const actual = submittedCounts[key] || 0;
-    if (expected !== actual) {
+    if (actual > expected) {
       return {
         isValid: false,
-        message: `Incorrect number of ships. Expected ${expected} ${key}(s), but got ${actual}.`,
+        message: `Incorrect number of ships. Max allowed for ${key} is ${expected}, but got ${actual}.`,
       };
     }
   }
@@ -53,7 +60,6 @@ export const validateShipPlacement = (ships, gridSize, shipConfig) => {
         };
       }
 
-
       const cellKey = `${pos.row},${pos.col}`;
       if (occupiedCells.has(cellKey)) {
         return {
@@ -62,7 +68,6 @@ export const validateShipPlacement = (ships, gridSize, shipConfig) => {
         };
       }
       occupiedCells.add(cellKey);
-
 
       if (pos.row !== first.row) isHorizontal = false;
       if (pos.col !== first.col) isVertical = false;

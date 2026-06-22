@@ -27,7 +27,7 @@ const gameSessionSchema = new mongoose.Schema(
     gridSize: {
       type: Number,
       required: true,
-      enum: [8, 10, 12, 15],
+      enum: [5, 8, 10, 12, 15],
       default: 10,
     },
 

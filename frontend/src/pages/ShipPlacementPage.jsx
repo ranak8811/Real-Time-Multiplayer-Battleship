@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate, Navigate } from "react-router-dom";
 import { useUser } from "../context/UserContext";
-import { getSessionById } from "../services/sessionService";
-import { placeShips } from "../services/sessionService";
+import { getSessionById, placeShips } from "../services/sessionService";
 import { socket } from "../services/socketService";
 import { toast } from "react-toastify";
 import { ArrowLeft, RefreshCw, RotateCw, Trash2, Shield } from "lucide-react";
@@ -39,6 +38,14 @@ const ShipPlacementPage = () => {
         .fill(null)
         .map(() => Array(size).fill("empty"));
       setBoard(initialBoard);
+
+
+      const activeTypes = Object.keys(data.session.shipConfig).filter(
+        (type) => data.session.shipConfig[type] > 0,
+      );
+      if (activeTypes.length > 0) {
+        setSelectedShipType(activeTypes[0]);
+      }
     } catch (error) {
       toast.error(error);
       navigate("/lobby");
@@ -54,7 +61,7 @@ const ShipPlacementPage = () => {
   }, [user, sessionId]);
 
   useEffect(() => {
-    if (!session || !user) return;
+    if (!session?.roomCode || !user?.userId) return;
 
     socket.emit("join-room", {
       roomCode: session.roomCode,
@@ -77,7 +84,6 @@ const ShipPlacementPage = () => {
     socket.on("match-start", (data) => {
       console.log("[Socket Event] Match starting:", data);
       toast.success(data.message || "Both fleets locked in! Match starts.");
-
       setTimeout(() => {
         navigate(`/game/${sessionId}`);
       }, 1500);
@@ -102,20 +108,24 @@ const ShipPlacementPage = () => {
   }
 
   if (!session) {
-    return <Navigate to="/lobby" replace />;
+    return (
+      <div className="min-h-screen bg-slate-955 text-white flex items-center justify-center">
+        <p className="text-slate-500">Loading session configuration...</p>
+      </div>
+    );
   }
 
-  const isOpponentJoined = session.opponentId !== null;
   const gridSize = session.gridSize;
+  const isOpponentJoined = session.opponentId !== null;
 
   const getPlacedCount = (type) => {
     return placedShips.filter((ship) => ship.shipId.startsWith(type)).length;
   };
 
-  const getShipCoords = (row, col, size) => {
+  const getCoordinates = (row, col, size, dir) => {
     const coords = [];
     for (let i = 0; i < size; i++) {
-      if (orientation === "horizontal") {
+      if (dir === "horizontal") {
         coords.push({ row, col: col + i });
       } else {
         coords.push({ row: row + i, col });
@@ -124,7 +134,13 @@ const ShipPlacementPage = () => {
     return coords;
   };
 
-  const checkValidity = (coords) => {
+  const handleMouseEnter = (row, col) => {
+    const size = SHIP_SIZES[selectedShipType];
+    const coords = getCoordinates(row, col, size, orientation);
+
+    let isValid = true;
+    const hoverArr = [];
+
     for (const coord of coords) {
       if (
         coord.row < 0 ||
@@ -132,28 +148,23 @@ const ShipPlacementPage = () => {
         coord.col < 0 ||
         coord.col >= gridSize
       ) {
-        return false;
+        isValid = false;
+        continue;
       }
-      const isOverlapping = placedShips.some((ship) =>
-        ship.positions.some((p) => p.row === coord.row && p.col === coord.col),
+      hoverArr.push(coord);
+
+      const isAlreadyOccupied = placedShips.some((ship) =>
+        ship.positions.some(
+          (pos) => pos.row === coord.row && pos.col === coord.col,
+        ),
       );
-      if (isOverlapping) return false;
-    }
-    return true;
-  };
-
-  const handleMouseEnter = (row, col) => {
-    const size = SHIP_SIZES[selectedShipType];
-
-    const maxAllowed = session.shipConfig[selectedShipType] || 0;
-    if (getPlacedCount(selectedShipType) >= maxAllowed) {
-      setHoveredCells([]);
-      return;
+      if (isAlreadyOccupied) {
+        isValid = false;
+      }
     }
 
-    const coords = getShipCoords(row, col, size);
-    setHoveredCells(coords);
-    setIsValidHover(checkValidity(coords));
+    setHoveredCells(hoverArr);
+    setIsValidHover(isValid && hoverArr.length === size);
   };
 
   const handleMouseLeave = () => {
@@ -162,29 +173,32 @@ const ShipPlacementPage = () => {
 
   const handleCellClick = (row, col) => {
     const size = SHIP_SIZES[selectedShipType];
-    const maxAllowed = session.shipConfig[selectedShipType] || 0;
+    const coords = getCoordinates(row, col, size, orientation);
 
-    if (getPlacedCount(selectedShipType) >= maxAllowed) {
-      toast.warning(`You have already placed all ${selectedShipType}s!`);
+    if (!isValidHover || hoveredCells.length !== size) {
+      toast.warning("Invalid ship position. Try another coordinates.");
       return;
     }
 
-    const coords = getShipCoords(row, col, size);
-    if (!checkValidity(coords)) {
-      toast.error(
-        "Invalid placement! Ships cannot overlap or go out of bounds.",
+    const currentTypeCount = getPlacedCount(selectedShipType);
+    const maxAllowed = session.shipConfig[selectedShipType];
+
+    if (currentTypeCount >= maxAllowed) {
+      toast.warning(
+        `You have reached the maximum allowed limit for ${selectedShipType.toUpperCase()}`,
       );
       return;
     }
 
-    const suffix = getPlacedCount(selectedShipType) + 1;
-    const newShip = {
+    const suffix = currentTypeCount + 1;
+    const newPlacedShip = {
       shipId: `${selectedShipType}_${suffix}`,
       size,
       positions: coords,
     };
 
-    setPlacedShips([...placedShips, newShip]);
+    const updatedPlacedShips = [...placedShips, newPlacedShip];
+    setPlacedShips(updatedPlacedShips);
 
     const updatedBoard = [...board];
     coords.forEach((coord) => {
@@ -194,6 +208,19 @@ const ShipPlacementPage = () => {
     setHoveredCells([]);
 
     toast.success(`${selectedShipType.toUpperCase()} placed successfully.`);
+
+
+    const activeTypes = Object.keys(session.shipConfig).filter(
+      (type) =>
+        session.shipConfig[type] > 0 &&
+        placedShips.filter((ship) => ship.shipId.startsWith(type)).length +
+        (selectedShipType === type ? 1 : 0) <
+        session.shipConfig[type],
+    );
+
+    if (activeTypes.length > 0) {
+      setSelectedShipType(activeTypes[0]);
+    }
   };
 
   const handleReset = () => {
@@ -203,17 +230,23 @@ const ShipPlacementPage = () => {
       .map(() => Array(gridSize).fill("empty"));
     setBoard(clearedBoard);
     toast.info("Fleet layout has been cleared.");
+
+    const activeTypes = Object.keys(session.shipConfig).filter(
+      (type) => session.shipConfig[type] > 0,
+    );
+    if (activeTypes.length > 0) {
+      setSelectedShipType(activeTypes[0]);
+    }
   };
 
+
   const isFleetComplete = () => {
-    return Object.keys(session.shipConfig).every(
-      (type) => getPlacedCount(type) === session.shipConfig[type],
-    );
+    return placedShips.length >= 2;
   };
 
   const handleSubmitPlacement = async () => {
     if (!isFleetComplete()) {
-      toast.error("Please place your entire fleet before locking in!");
+      toast.error("Please place at least 2 ships before locking in!");
       return;
     }
 
@@ -235,12 +268,12 @@ const ShipPlacementPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-6 flex flex-col justify-center items-center">
+    <div className="min-h-screen bg-slate-955 bg-slate-950 text-white p-6 flex flex-col justify-center items-center select-none">
       <div className="max-w-5xl w-full bg-slate-900 border border-slate-800 p-8 rounded-2xl relative shadow-2xl">
         <button
           onClick={() => navigate("/lobby")}
           disabled={submitting}
-          className="absolute top-6 left-6 text-slate-500 hover:text-slate-300 transition duration-300 disabled:opacity-50"
+          className="absolute top-6 left-6 text-slate-500 hover:text-slate-350 transition duration-300 disabled:opacity-50"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -268,7 +301,7 @@ const ShipPlacementPage = () => {
               Opponent
             </p>
             <p
-              className={`font-bold text-base ${isOpponentJoined ? "text-emerald-400" : "text-slate-650 italic animate-pulse"}`}
+              className={`font-bold text-base ${isOpponentJoined ? "text-emerald-400" : "text-slate-500 italic animate-pulse"}`}
             >
               {isOpponentJoined
                 ? session.opponentId.displayName
@@ -295,7 +328,7 @@ const ShipPlacementPage = () => {
           <div className="grid lg:grid-cols-12 gap-8 items-start justify-center">
             <div className="lg:col-span-7 flex flex-col items-center">
               <div
-                className="grid gap-1 bg-slate-950 border border-slate-850 p-3 rounded-2xl max-w-[380px] w-full aspect-square"
+                className="grid gap-1 bg-slate-950 border border-slate-850 p-3 rounded-2xl max-w-[380px] w-full aspect-square shadow-inner"
                 style={{
                   gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`,
                 }}
@@ -307,9 +340,10 @@ const ShipPlacementPage = () => {
                     );
                     const isOccupied = cellState === "ship";
 
-                    let cellBg = "bg-slate-900/50 hover:bg-slate-850";
+                    let cellBg = "bg-slate-900/50 hover:bg-slate-850/60";
                     if (isOccupied)
-                      cellBg = "bg-cyan-500/20 border-cyan-500 text-cyan-400";
+                      cellBg =
+                        "bg-cyan-500/20 border-cyan-500 text-cyan-400 shadow-[inset_0_0_8px_rgba(6,182,212,0.25)]";
                     if (isHovered) {
                       cellBg = isValidHover
                         ? "bg-emerald-500/30 border-emerald-500"
@@ -350,57 +384,67 @@ const ShipPlacementPage = () => {
               </div>
 
               <div className="space-y-2">
-                <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold mb-1">
+                <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold mb-2 font-mono">
                   Available Fleet
                 </p>
-                {Object.keys(session.shipConfig).map((type) => {
-                  const maxCount = session.shipConfig[type];
-                  const currentCount = getPlacedCount(type);
-                  const isCompleted = currentCount === maxCount;
-                  const isSelected = selectedShipType === type;
+                {Object.keys(session.shipConfig)
+                  .filter((type) => session.shipConfig[type] > 0)
+                  .map((type) => {
+                    const maxCount = session.shipConfig[type];
+                    const currentCount = getPlacedCount(type);
+                    const isCompleted = currentCount === maxCount;
+                    const isSelected = selectedShipType === type;
 
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setSelectedShipType(type)}
-                      disabled={isCompleted || submitting}
-                      className={`w-full p-4 rounded-xl border text-left flex justify-between items-center transition ${
-                        isSelected
-                          ? "bg-cyan-500/10 border-cyan-500 text-cyan-400"
-                          : isCompleted
-                            ? "bg-slate-900/30 border-slate-900 text-slate-600 cursor-not-allowed"
-                            : "bg-slate-950 border-slate-850 text-slate-300 hover:border-slate-700"
-                      }`}
-                    >
-                      <span className="capitalize font-semibold">
-                        {type} (Size: {SHIP_SIZES[type]})
-                      </span>
-                      <span className="text-xs font-mono font-bold bg-slate-900 px-3 py-1 rounded-full text-slate-400">
-                        {currentCount} / {maxCount}
-                      </span>
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setSelectedShipType(type)}
+                        disabled={isCompleted || submitting}
+                        className={`w-full p-4 rounded-xl border text-left flex justify-between items-center transition ${isSelected
+                            ? "bg-cyan-500/10 border-cyan-500 text-cyan-400 shadow-md shadow-cyan-950/20"
+                            : isCompleted
+                              ? "bg-slate-950/20 border-slate-900 text-slate-550 opacity-45 cursor-not-allowed"
+                              : "bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-400"
+                          }`}
+                      >
+                        <div className="flex flex-col">
+                          <span className="font-bold text-sm">
+                            {type.charAt(0).toUpperCase() +
+                              type.slice(1).replace("Boat", " Boat")}
+                          </span>
+                          <span className="text-[10px] text-slate-500 mt-1 font-mono">
+                            Size: {SHIP_SIZES[type]} Cells
+                          </span>
+                        </div>
+                        <span className="font-bold text-sm font-mono">
+                          {currentCount} / {maxCount}
+                        </span>
+                      </button>
+                    );
+                  })}
               </div>
 
-              <div className="pt-4 border-t border-slate-800 flex gap-4">
+              <div className="flex gap-4 pt-4 border-t border-slate-800">
                 <button
                   type="button"
                   onClick={handleReset}
                   disabled={placedShips.length === 0 || submitting}
-                  className="bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-400 p-3.5 rounded-xl transition disabled:opacity-30 disabled:cursor-not-allowed"
+                  className="flex-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 py-3.5 px-4 rounded-xl font-bold flex items-center justify-center gap-2 transition duration-300 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <Trash2 className="w-5 h-5" />
+                  <Trash2 className="w-4 h-4" /> Reset Layout
                 </button>
 
                 <button
                   type="button"
                   onClick={handleSubmitPlacement}
-                  disabled={submitting || !isFleetComplete()}
-                  className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={submitting}
+                  className={`flex-1 font-bold py-3.5 px-4 rounded-xl shadow-lg transition duration-300 transform active:scale-95 ${isFleetComplete()
+                      ? "bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white shadow-cyan-950/30"
+                      : "bg-slate-950 border border-slate-850/60 text-slate-500 cursor-not-allowed opacity-50"
+                    }`}
                 >
-                  {submitting ? "Locking in..." : "Lock In Placement"}
+                  {submitting ? "Locking..." : "Lock In Fleet"}
                 </button>
               </div>
             </div>

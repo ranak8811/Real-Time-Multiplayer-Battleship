@@ -42,10 +42,10 @@ export const createSession = async (req, res) => {
       });
     }
 
-    if (gridSize && ![8, 10, 12, 15].includes(Number(gridSize))) {
+    if (gridSize && ![5, 8, 10, 12, 15].includes(Number(gridSize))) {
       return res.status(400).json({
         success: false,
-        message: "Grid size must be 8, 10, 12, or 15",
+        message: "Grid size must be 5, 8, 10, 12, or 15",
       });
     }
 
@@ -61,16 +61,27 @@ export const createSession = async (req, res) => {
       }
     }
 
+    let defaultShipConfig = {
+      carrier: 1,
+      battleship: 2,
+      destroyer: 3,
+      patrolBoat: 4,
+    };
+
+    if (Number(gridSize) === 5) {
+      defaultShipConfig = {
+        carrier: 0,
+        battleship: 0,
+        destroyer: 1,
+        patrolBoat: 2,
+      };
+    }
+
     const newSession = await GameSession.create({
       roomCode,
       ownerId,
       gridSize: gridSize ? Number(gridSize) : 10,
-      shipConfig: shipConfig || {
-        carrier: 1,
-        battleship: 2,
-        destroyer: 3,
-        patrolBoat: 4,
-      },
+      shipConfig: shipConfig || defaultShipConfig,
       status: "waiting",
     });
 
