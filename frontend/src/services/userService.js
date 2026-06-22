@@ -22,3 +22,15 @@ export const getUserDetails = async (userId) => {
     );
   }
 };
+
+export const getLeaderboard = async () => {
+  try {
+    const response = await axiosClient.get("/users/leaderboard");
+    return response.data;
+  } catch (error) {
+    console.error("Error in getLeaderboard service:", error);
+    throw (
+      error.response?.data?.message || "Failed to retrieve leaderboard rankings"
+    );
+  }
+};

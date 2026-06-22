@@ -76,3 +76,23 @@ export const getUserById = async (req, res) => {
     });
   }
 };
+
+export const getLeaderboard = async (req, res) => {
+  try {
+    const topUsers = await User.find()
+      .sort({ wins: -1, gamesPlayed: 1 })
+      .limit(10)
+      .select("displayName wins losses gamesPlayed");
+
+    return res.status(200).json({
+      success: true,
+      leaderboard: topUsers,
+    });
+  } catch (error) {
+    console.error("Error in getLeaderboard controller:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error occurred while retrieving leaderboard",
+    });
+  }
+};
