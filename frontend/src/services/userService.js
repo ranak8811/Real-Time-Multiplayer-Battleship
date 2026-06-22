@@ -34,3 +34,13 @@ export const getLeaderboard = async () => {
     );
   }
 };
+
+export const loginUserByName = async (name) => {
+  try {
+    const response = await axiosClient.post("/users/login", { name });
+    return response.data;
+  } catch (error) {
+    console.error("Error in loginUserByName service:", error);
+    throw error.response?.data?.message || "Failed to login as captain";
+  }
+};

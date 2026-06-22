@@ -96,3 +96,43 @@ export const getLeaderboard = async (req, res) => {
     });
   }
 };
+
+export const loginUserByName = async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    if (!name || name.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "Display name is required to login",
+      });
+    }
+
+    const trimmedName = name.trim();
+
+    const existingUser = await User.findOne({
+      displayName: { $regex: new RegExp(`^${trimmedName}$`, "i") },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "No captain found with this name. If you are new, please select 'New Captain'!",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      userId: existingUser._id,
+      displayName: existingUser.displayName,
+      message: "Welcome back, Captain!",
+    });
+  } catch (error) {
+    console.error("Error in loginUserByName controller:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error occurred during captain login",
+    });
+  }
+};
