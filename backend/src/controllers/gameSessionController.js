@@ -96,6 +96,27 @@ export const createSession = async (req, res) => {
 
 export const getSessions = async (req, res) => {
   try {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    await GameSession.deleteMany({
+      status: "waiting",
+      createdAt: { $lt: twoHoursAgo },
+    });
+
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+    const finishedSessions = await GameSession.find({
+      status: "finished",
+      updatedAt: { $lt: thirtyMinutesAgo },
+    });
+
+    const finishedSessionIds = finishedSessions.map((s) => s._id);
+    if (finishedSessionIds.length > 0) {
+      await GameState.deleteMany({ sessionId: { $in: finishedSessionIds } });
+      await GameSession.deleteMany({ _id: { $in: finishedSessionIds } });
+      console.log(
+        `[Database Cleanup] Purged ${finishedSessionIds.length} stale finished sessions.`,
+      );
+    }
+
     const sessions = await GameSession.find({ status: "waiting" })
       .populate("ownerId", "displayName")
       .sort({ createdAt: -1 });

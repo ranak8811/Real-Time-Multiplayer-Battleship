@@ -53,7 +53,6 @@ const GamePage = () => {
     }
   }, [user, sessionId]);
 
-  // সকেট ইভেন্ট
   useEffect(() => {
     if (!session || !user) return;
 
@@ -62,7 +61,6 @@ const GamePage = () => {
       userId: user.userId,
     });
 
-    // ১. শট ফায়ার হওয়ার রিয়েল-টাইম আপডেট
     socket.on("shot-fired", (data) => {
       setGameState(data.gameState);
 
@@ -115,7 +113,6 @@ const GamePage = () => {
       }
     });
 
-    // ২. অপোনেন্ট খেলা ছেড়ে চলে যাওয়ার রিয়েল-টাইম আপডেট লিসেনার
     socket.on("opponent-left", (data) => {
       console.log("[Socket Event] Opponent Left Room:", data);
       setGameState(data.gameState);
@@ -192,7 +189,6 @@ const GamePage = () => {
     }
   };
 
-  // ম্যানুয়াল রিট্রিট বা লিভ করার হ্যান্ডলার
   const handleRetreat = () => {
     if (!isFinished) {
       const confirmRetreat = window.confirm(
@@ -200,7 +196,6 @@ const GamePage = () => {
       );
       if (!confirmRetreat) return;
 
-      // সার্ভারে লিভ করার সকেট ইভেন্ট পাঠানো
       socket.emit("leave-room", {
         roomCode: session.roomCode,
         userId: user.userId,
@@ -267,7 +262,7 @@ const GamePage = () => {
             )}
 
             <button
-              onClick={handleRetreat} // handleRetreat ফাংশন কল করা হয়েছে
+              onClick={handleRetreat}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 hover:bg-rose-950/20 hover:border-rose-900/40 text-slate-400 hover:text-rose-400 transition duration-300"
             >
               <LogOut className="w-4 h-4" />
@@ -276,9 +271,8 @@ const GamePage = () => {
           </div>
         </header>
 
-        {/* Victory/Defeat Banner */}
         {isFinished && (
-          <div className="mb-8 p-6 rounded-3xl bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-amber-500/10 border border-amber-500/30 text-center shadow-[0_0_30px_rgba(245,158,11,0.05)]">
+          <div className="mb-8 p-6 rounded-3xl bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-amber-500/10 border border-amber-500/30 text-center shadow-[0_0_30px_rgba(245,158,11,0.05)] flex flex-col items-center">
             <Trophy className="w-12 h-12 text-amber-400 mx-auto mb-2 animate-bounce" />
             <h2 className="text-xl font-bold text-amber-300">
               {gameState.winner === user.userId
@@ -288,10 +282,16 @@ const GamePage = () => {
             <p className="text-xs text-slate-400 mt-1 uppercase font-mono tracking-widest">
               Winner: {gameState.winner === user.userId ? myName : opponentName}
             </p>
+
+            <button
+              onClick={() => navigate("/lobby")}
+              className="mt-4 px-6 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-bold rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.1)] transition duration-300 hover:scale-105"
+            >
+              Return to Lobby
+            </button>
           </div>
         )}
 
-        {/* Players Info Cards */}
         <div className="grid grid-cols-2 gap-4 mb-8">
           <div
             className={`p-4 rounded-2xl border transition duration-300 ${!isFinished && isMyTurn ? "bg-cyan-500/5 border-cyan-500/25" : "bg-slate-900/50 border-slate-800/60"}`}
@@ -313,9 +313,7 @@ const GamePage = () => {
           </div>
         </div>
 
-        {/* Battlefield Grids */}
         <div className="grid lg:grid-cols-2 gap-10">
-          {/* Radar Board (Attacks) */}
           <div className="bg-slate-900/40 border border-slate-800/80 p-6 rounded-3xl relative overflow-hidden backdrop-blur-md">
             <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-3xl -z-10"></div>
             <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
@@ -389,12 +387,11 @@ const GamePage = () => {
             </div>
           </div>
 
-          {/* Fleet Board (Defense) */}
           <div className="bg-slate-900/40 border border-slate-800/80 p-6 rounded-3xl relative overflow-hidden backdrop-blur-md">
             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-3xl -z-10"></div>
             <div className="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
               <h2 className="font-extrabold text-lg text-amber-500 uppercase tracking-wider flex items-center gap-2">
-                <Shield className="w-5 h-5 text-amber-500" /> Fleet Board
+                <Shield className="w-5 h-5 text-amber-550" /> Fleet Board
                 (Defense)
               </h2>
               <span className="text-xs text-slate-500 font-mono">
@@ -450,7 +447,6 @@ const GamePage = () => {
           </div>
         </div>
 
-        {/* Legend */}
         <footer className="mt-10 bg-slate-900/20 border border-slate-800/60 p-4 rounded-2xl flex flex-wrap justify-center gap-6 text-sm text-slate-400 font-mono">
           <div className="flex items-center gap-2">
             <span className="w-4 h-4 border border-slate-800 bg-slate-950 rounded-sm"></span>
