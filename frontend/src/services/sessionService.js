@@ -14,9 +14,9 @@ export const getSessions = async () => {
   }
 };
 
-export const createSession = async (ownerId, gridSize) => {
+export const createSession = async (ownerId, gridSize, isVSComputer = false) => {
   try {
-    const response = await axiosClient.post("/sessions", { ownerId, gridSize });
+    const response = await axiosClient.post("/sessions", { ownerId, gridSize, isVSComputer });
     return response.data;
   } catch (error) {
     console.error("Error in createSession service:", error);

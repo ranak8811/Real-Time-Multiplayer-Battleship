@@ -23,11 +23,15 @@ const CreateGamePage = () => {
     return <Navigate to="/" replace />;
   }
 
-  const handleHostGame = async () => {
+  const handleHostGame = async (isVSComputer = false) => {
     setLoading(true);
     try {
-      const response = await createSession(user.userId, gridSize);
-      toast.success(`Room created successfully! Code: ${response.roomCode}`);
+      const response = await createSession(user.userId, gridSize, isVSComputer);
+      if (isVSComputer) {
+        toast.success(`AI session created successfully! Entering placement...`);
+      } else {
+        toast.success(`Room created successfully! Code: ${response.roomCode}`);
+      }
       navigate(`/place-ships/${response.sessionId}`);
     } catch (error) {
       toast.error(error);
@@ -121,13 +125,20 @@ const CreateGamePage = () => {
             )}
           </div>
 
-          <div className="pt-4 border-t border-slate-800">
+          <div className="pt-4 border-t border-slate-800 space-y-3">
             <button
-              onClick={handleHostGame}
+              onClick={() => handleHostGame(false)}
+              disabled={loading}
+              className="w-full bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-350 hover:text-white font-bold py-3.5 px-6 rounded-xl transform active:scale-95 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm uppercase tracking-wider"
+            >
+              {loading ? "Creating..." : "Host Multiplayer Match"}
+            </button>
+            <button
+              onClick={() => handleHostGame(true)}
               disabled={loading}
               className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-cyan-950/20 transform active:scale-95 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed text-sm uppercase tracking-wider"
             >
-              {loading ? "Creating Session..." : "Host Match"}
+              {loading ? "Creating..." : "Battle VS Computer (AI)"}
             </button>
           </div>
         </div>

@@ -16,9 +16,204 @@ const generateRoomCode = () => {
   return code;
 };
 
+const generateRandomPlacement = (gridSize, shipConfig) => {
+  const ships = [];
+  const board = Array(gridSize)
+    .fill(null)
+    .map(() => Array(gridSize).fill("empty"));
+
+  const shipTypes = [
+    { name: "Carrier", key: "carrier", size: 5 },
+    { name: "Battleship", key: "battleship", size: 4 },
+    { name: "Destroyer", key: "destroyer", size: 3 },
+    { name: "Patrol Boat", key: "patrolBoat", size: 2 },
+  ];
+
+  let shipCounter = 1;
+
+  for (const type of shipTypes) {
+    const count = shipConfig[type.key] !== undefined ? shipConfig[type.key] : 0;
+    for (let i = 0; i < count; i++) {
+      let placed = false;
+      let retries = 0;
+      while (!placed && retries < 200) {
+        retries++;
+        const isHorizontal = Math.random() < 0.5;
+        const size = type.size;
+        const startRow = Math.floor(
+          Math.random() * (isHorizontal ? gridSize : gridSize - size + 1),
+        );
+        const startCol = Math.floor(
+          Math.random() * (isHorizontal ? gridSize - size + 1 : gridSize),
+        );
+
+        let fits = true;
+        const positions = [];
+        for (let s = 0; s < size; s++) {
+          const r = isHorizontal ? startRow : startRow + s;
+          const c = isHorizontal ? startCol + s : startCol;
+          if (board[r][c] !== "empty") {
+            fits = false;
+            break;
+          }
+          positions.push({ row: r, col: c });
+        }
+
+        if (fits) {
+          for (const pos of positions) {
+            board[pos.row][pos.col] = "ship";
+          }
+          ships.push({
+            shipId: `${type.key}_${shipCounter++}`,
+            size: size,
+            positions: positions,
+            hits: [],
+          });
+          placed = true;
+        }
+      }
+    }
+  }
+
+  return { ships, board };
+};
+
+const runComputerTurn = async (session, gameState, io) => {
+  try {
+    if (gameState.gameStatus !== "active") return;
+
+    const defenderRole = "player1";
+    const attackerId = session.opponentId;
+    const defenderBoard = gameState.player1Board;
+    const defenderShips = gameState.player1Ships;
+    const gridSize = session.gridSize;
+
+    let row = -1;
+    let col = -1;
+
+    let huntingCandidates = [];
+    for (const ship of defenderShips) {
+      if (ship.hits.length > 0 && ship.hits.length < ship.size) {
+        const directions = [
+          { r: -1, c: 0 },
+          { r: 1, c: 0 },
+          { r: 0, c: -1 },
+          { r: 0, c: 1 },
+        ];
+        for (const hit of ship.hits) {
+          for (const dir of directions) {
+            const nr = hit.row + dir.r;
+            const nc = hit.col + dir.c;
+            if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
+              const cell = defenderBoard[nr][nc];
+              if (cell !== "hit" && cell !== "miss") {
+                huntingCandidates.push({ row: nr, col: nc });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (huntingCandidates.length > 0) {
+      const chosen =
+        huntingCandidates[Math.floor(Math.random() * huntingCandidates.length)];
+      row = chosen.row;
+      col = chosen.col;
+    } else {
+      const randomCandidates = [];
+      for (let r = 0; r < gridSize; r++) {
+        for (let c = 0; c < gridSize; c++) {
+          const cell = defenderBoard[r][c];
+          if (cell !== "hit" && cell !== "miss") {
+            randomCandidates.push({ row: r, col: c });
+          }
+        }
+      }
+      if (randomCandidates.length > 0) {
+        const chosen =
+          randomCandidates[Math.floor(Math.random() * randomCandidates.length)];
+        row = chosen.row;
+        col = chosen.col;
+      }
+    }
+
+    if (row === -1 || col === -1) return;
+
+    const targetCell = defenderBoard[row][col];
+    let isHit = false;
+    let sunkShipId = null;
+
+    if (targetCell === "ship") {
+      isHit = true;
+      defenderBoard[row][col] = "hit";
+
+      for (const ship of defenderShips) {
+        const isPart = ship.positions.some(
+          (pos) => pos.row === row && pos.col === col,
+        );
+        if (isPart) {
+          const alreadyHit = ship.hits.some(
+            (h) => h.row === row && h.col === col,
+          );
+          if (!alreadyHit) {
+            ship.hits.push({ row, col });
+          }
+          if (ship.hits.length === ship.size) {
+            sunkShipId = ship.shipId;
+          }
+          break;
+        }
+      }
+    } else {
+      defenderBoard[row][col] = "miss";
+    }
+
+    const allSunk = defenderShips.every(
+      (ship) => ship.hits.length === ship.size,
+    );
+
+    if (allSunk) {
+      gameState.gameStatus = "finished";
+      gameState.winner = attackerId;
+      session.status = "finished";
+      await session.save();
+
+      await User.findByIdAndUpdate(attackerId, {
+        $inc: { wins: 1, gamesPlayed: 1 },
+      });
+      await User.findByIdAndUpdate(session.ownerId, {
+        $inc: { losses: 1, gamesPlayed: 1 },
+      });
+    } else {
+      gameState.currentTurn = session.ownerId;
+    }
+
+    gameState.markModified(`${defenderRole}Board`);
+    gameState.markModified(`${defenderRole}Ships`);
+    await gameState.save();
+
+    if (io) {
+      setTimeout(() => {
+        io.to(session.roomCode.trim().toUpperCase()).emit("shot-fired", {
+          gameState,
+          attackerId: attackerId,
+          row,
+          col,
+          result: isHit ? "hit" : "miss",
+          sunkShip: sunkShipId,
+          winnerId: gameState.winner || null,
+        });
+      }, 1000);
+    }
+  } catch (err) {
+    console.error("Error in runComputerTurn:", err);
+  }
+};
+
 export const createSession = async (req, res) => {
   try {
-    const { ownerId, gridSize, shipConfig } = req.body;
+    const { ownerId, gridSize, shipConfig, isVSComputer } = req.body;
 
     if (!ownerId) {
       return res.status(400).json({
@@ -77,13 +272,59 @@ export const createSession = async (req, res) => {
       };
     }
 
+    let opponentId = null;
+    let status = "waiting";
+    let botUser = null;
+
+    if (isVSComputer) {
+      botUser = await User.findOne({ displayName: "Commander Bot" });
+      if (!botUser) {
+        botUser = await User.create({
+          displayName: "Commander Bot",
+          gamesPlayed: 0,
+          wins: 0,
+          losses: 0,
+        });
+      }
+      opponentId = botUser._id;
+      status = "in_progress";
+    }
+
     const newSession = await GameSession.create({
       roomCode,
       ownerId,
+      opponentId,
       gridSize: gridSize ? Number(gridSize) : 10,
       shipConfig: shipConfig || defaultShipConfig,
-      status: "waiting",
+      status,
     });
+
+    if (isVSComputer) {
+      const createEmptyBoard = (size) => {
+        const board = [];
+        for (let i = 0; i < size; i++) {
+          board.push(Array(size).fill("empty"));
+        }
+        return board;
+      };
+
+      const finalGridSize = gridSize ? Number(gridSize) : 10;
+      const finalShipConfig = shipConfig || defaultShipConfig;
+      const botPlacement = generateRandomPlacement(
+        finalGridSize,
+        finalShipConfig,
+      );
+
+      await GameState.create({
+        sessionId: newSession._id,
+        player1Board: createEmptyBoard(finalGridSize),
+        player2Board: botPlacement.board,
+        player1Ships: [],
+        player2Ships: botPlacement.ships,
+        currentTurn: ownerId,
+        gameStatus: "placement",
+      });
+    }
 
     return res.status(201).json({
       success: true,
@@ -95,6 +336,12 @@ export const createSession = async (req, res) => {
         userId: ownerExists._id,
         displayName: ownerExists.displayName,
       },
+      opponent: botUser
+        ? {
+            userId: botUser._id,
+            displayName: botUser.displayName,
+          }
+        : null,
     });
   } catch (error) {
     console.error("Error in createSession controller:", error);
@@ -575,6 +822,14 @@ export const fireShot = async (req, res) => {
     gameState.markModified(`${defenderRole}Ships`);
     await gameState.save();
 
+    let nextTurnIsBot = false;
+    if (!allSunk) {
+      const nextUser = await User.findById(gameState.currentTurn);
+      if (nextUser && nextUser.displayName === "Commander Bot") {
+        nextTurnIsBot = true;
+      }
+    }
+
     const io = req.app.get("io");
     if (io) {
       io.to(session.roomCode.trim().toUpperCase()).emit("shot-fired", {
@@ -586,6 +841,10 @@ export const fireShot = async (req, res) => {
         sunkShip: sunkShipId,
         winnerId: gameState.winner || null,
       });
+    }
+
+    if (nextTurnIsBot) {
+      runComputerTurn(session, gameState, io);
     }
 
     return res.status(200).json({
