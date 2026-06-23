@@ -118,6 +118,11 @@ const ShipPlacementPage = () => {
   const gridSize = session.gridSize;
   const isOpponentJoined = session.opponentId !== null;
 
+  const totalShipsAllowed = session?.shipConfig
+    ? Object.values(session.shipConfig).reduce((sum, count) => sum + count, 0)
+    : 0;
+  const allShipsPlaced = placedShips.length >= totalShipsAllowed;
+
   const getPlacedCount = (type) => {
     return placedShips.filter((ship) => ship.shipId.startsWith(type)).length;
   };
@@ -135,6 +140,7 @@ const ShipPlacementPage = () => {
   };
 
   const handleMouseEnter = (row, col) => {
+    if (allShipsPlaced) return;
     const size = SHIP_SIZES[selectedShipType];
     const coords = getCoordinates(row, col, size, orientation);
 
@@ -172,6 +178,7 @@ const ShipPlacementPage = () => {
   };
 
   const handleCellClick = (row, col) => {
+    if (allShipsPlaced) return;
     const size = SHIP_SIZES[selectedShipType];
     const coords = getCoordinates(row, col, size, orientation);
 
@@ -344,7 +351,7 @@ const ShipPlacementPage = () => {
                     if (isOccupied)
                       cellBg =
                         "bg-cyan-500/20 border-cyan-500 text-cyan-400 shadow-[inset_0_0_8px_rgba(6,182,212,0.25)]";
-                    if (isHovered) {
+                    if (isHovered && !allShipsPlaced) {
                       cellBg = isValidHover
                         ? "bg-emerald-500/30 border-emerald-500"
                         : "bg-red-500/30 border-red-500";
@@ -357,8 +364,8 @@ const ShipPlacementPage = () => {
                         onMouseEnter={() => handleMouseEnter(rIndex, cIndex)}
                         onMouseLeave={handleMouseLeave}
                         onClick={() => handleCellClick(rIndex, cIndex)}
-                        disabled={submitting}
-                        className={`aspect-square rounded border border-slate-850/50 flex items-center justify-center transition duration-150 ${cellBg}`}
+                        disabled={submitting || allShipsPlaced}
+                        className={`aspect-square rounded border border-slate-850/50 flex items-center justify-center transition duration-150 ${allShipsPlaced ? "cursor-not-allowed" : ""} ${cellBg}`}
                       />
                     );
                   }),
@@ -376,12 +383,19 @@ const ShipPlacementPage = () => {
                       orientation === "horizontal" ? "vertical" : "horizontal",
                     )
                   }
-                  className="bg-slate-950 hover:bg-slate-850 border border-slate-800 p-2.5 rounded-xl text-cyan-400 font-bold flex items-center gap-2 transition"
+                  disabled={allShipsPlaced}
+                  className={`bg-slate-950 hover:bg-slate-850 border border-slate-800 p-2.5 rounded-xl text-cyan-400 font-bold flex items-center gap-2 transition ${allShipsPlaced ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
                   <RotateCw className="w-4 h-4" /> Rotate (
                   {orientation === "horizontal" ? "H" : "V"})
                 </button>
               </div>
+
+              {allShipsPlaced && (
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono animate-pulse shadow-[0_0_15px_rgba(16,185,129,0.05)]">
+                  🎉 All ships placed! To play the game, click on the **Lock In Fleet** button.
+                </div>
+              )}
 
               <div className="space-y-2">
                 <p className="text-xs text-slate-500 uppercase tracking-widest font-semibold mb-2 font-mono">
@@ -400,10 +414,10 @@ const ShipPlacementPage = () => {
                         key={type}
                         type="button"
                         onClick={() => setSelectedShipType(type)}
-                        disabled={isCompleted || submitting}
+                        disabled={isCompleted || submitting || allShipsPlaced}
                         className={`w-full p-4 rounded-xl border text-left flex justify-between items-center transition ${isSelected
                             ? "bg-cyan-500/10 border-cyan-500 text-cyan-400 shadow-md shadow-cyan-950/20"
-                            : isCompleted
+                            : (isCompleted || allShipsPlaced)
                               ? "bg-slate-950/20 border-slate-900 text-slate-550 opacity-45 cursor-not-allowed"
                               : "bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-400"
                           }`}

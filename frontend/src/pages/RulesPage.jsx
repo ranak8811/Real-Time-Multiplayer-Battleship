@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, BookOpen, Anchor, Crosshair, Trophy, AlertTriangle, ShieldCheck } from "lucide-react";
+import { ArrowLeft, BookOpen, Anchor, Crosshair, Trophy, AlertTriangle, ShieldCheck, Shield } from "lucide-react";
 
 const RulesPage = () => {
   const navigate = useNavigate();
@@ -130,6 +130,43 @@ const RulesPage = () => {
                 </span>
               </li>
             </ul>
+          </div>
+
+          {/* Captain Credentials & Sessions */}
+          <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800/80 shadow-md md:col-span-2">
+            <h3 className="text-base font-extrabold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Shield className="w-5 h-5 text-cyan-400" />
+              5. Captain Credentials & Authentication
+            </h3>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-slate-200 font-mono uppercase tracking-wider">
+                  New vs. Returning Captains
+                </h4>
+                <ul className="space-y-3 text-xs text-slate-400 font-mono">
+                  <li className="flex gap-2">
+                    <span className="text-cyan-400">■</span>
+                    <span>
+                      <strong className="text-slate-200">Register (New Captain):</strong> Choose a unique name. If the name is already in use, a numeric suffix (e.g., John 2) is automatically appended to keep accounts distinct.
+                    </span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-cyan-400">■</span>
+                    <span>
+                      <strong className="text-slate-200">Login (Returning Captain):</strong> Return using your exact original name to retrieve your stats, game history, and rank instantly.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-slate-200 font-mono uppercase tracking-wider">
+                  Why it is built this way
+                </h4>
+                <p className="text-xs text-slate-400 leading-relaxed font-mono">
+                  Since Captain profiles contain valuable stats like total battles, wins, losses, and leaderboard standing, this dual system prevents new players from accidentally overwriting or accessing a veteran captain's historical data, while providing seamless profile recovery for returning players.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
